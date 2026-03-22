@@ -2,36 +2,21 @@
 
 import { useState, useRef, useEffect } from 'react'
 import MessageBubble, { type Message } from './MessageBubble'
-import type { Department } from '@/app/page'
 
-const POLY_WELCOME: Message = {
+const WELCOME_MESSAGE: Message = {
   role: 'assistant',
   content:
-    'Ciao! Sono Poly Assistant, il tuo esperto AI per il reparto Polimerizzazione di Radici Yarn.\n\nPosso aiutarti con:\n• Domande su processi di polimerizzazione PA6/PA66\n• Informazioni dai manuali e procedure interne\n• Supporto su chimica dei polimeri e caprolattame\n• Troubleshooting impianti e macchinari\n\nCome posso aiutarti oggi?',
+    'Benvenuto nell\'Analisi Filiere.\n\nPosso aiutarti a:\n• Analizzare lo stato di salute di una filiera tramite foto\n• Identificare usura, ostruzioni e depositi sui capillari\n• Stimare la vita residua e pianificare la manutenzione\n• Fornire un punteggio salute filiera da 1 a 10\n\nPrima di analizzare una foto, ti farò alcune domande per contestualizzare meglio l\'analisi (tipo, materiale, polimero in lavorazione, ecc.).\n\nComincia descrivendo la filiera o carica direttamente una foto.',
 }
 
-const POY_WELCOME: Message = {
-  role: 'assistant',
-  content:
-    "Sono l'assistente documentale delle linee di filatura. Rispondo basandomi sui manuali e documenti interni del reparto POY.\n\nPosso aiutarti con:\n• Documenti e procedure del reparto filatura\n• Manuali tecnici delle linee POY\n• Schede tecniche e parametri di processo\n• Procedure operative e di sicurezza\n\nCome posso aiutarti?",
-}
-
-interface ChatProps {
-  department: Department
-}
-
-export default function Chat({ department }: ChatProps) {
-  const [messages, setMessages] = useState<Message[]>([
-    department === 'poy' ? POY_WELCOME : POLY_WELCOME,
-  ])
+export default function ChatFiliere() {
+  const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [imageFile, setImageFile] = useState<File | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
-
-  useEffect(() => {
-    setMessages([department === 'poy' ? POY_WELCOME : POLY_WELCOME])
-  }, [department])
+  const imageInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -39,11 +24,30 @@ export default function Chat({ department }: ChatProps) {
 
   const sendMessage = async () => {
     const text = input.trim()
-    if (!text || isLoading) return
+    if ((!text && !imageFile) || isLoading) return
 
-    const userMessage: Message = { role: 'user', content: text }
+    let imageBase64: string | null = null
+    let imageMediaType: string | null = null
+
+    if (imageFile) {
+      imageMediaType = imageFile.type
+      const buffer = await imageFile.arrayBuffer()
+      const bytes = new Uint8Array(buffer)
+      let binary = ''
+      for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i])
+      }
+      imageBase64 = btoa(binary)
+    }
+
+    const userContent = imageFile
+      ? `[Immagine allegata: ${imageFile.name}]${text ? `\n${text}` : ''}`
+      : text
+    const userMessage: Message = { role: 'user', content: userContent }
+
     setMessages((prev) => [...prev, userMessage])
     setInput('')
+    setImageFile(null)
     setIsLoading(true)
 
     const history = messages
@@ -54,10 +58,15 @@ export default function Chat({ department }: ChatProps) {
     setMessages((prev) => [...prev, { role: 'assistant', content: '', isStreaming: true }])
 
     try {
-      const response = await fetch('/api/chat', {
+      const response = await fetch('/api/chat-filiere', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, history, department }),
+        body: JSON.stringify({
+          message: text || '(Analizza l\'immagine allegata)',
+          history,
+          imageBase64,
+          imageMediaType,
+        }),
       })
 
       if (!response.ok) throw new Error('Risposta del server non valida')
@@ -104,14 +113,13 @@ export default function Chat({ department }: ChatProps) {
         }
       }
     } catch (error) {
-      console.error('Errore chat:', error)
+      console.error('Errore chat filiere:', error)
       setMessages((prev) =>
         prev.map((msg, i) =>
           i === assistantMessageIndex
             ? {
                 ...msg,
-                content:
-                  'Si è verificato un errore durante la generazione della risposta. Riprova tra poco.',
+                content: 'Si è verificato un errore. Riprova tra poco.',
                 isStreaming: false,
               }
             : msg
@@ -130,14 +138,6 @@ export default function Chat({ department }: ChatProps) {
     }
   }
 
-  const accentColor = department === 'poy' ? '#a78bfa' : '#4f8cff'
-  const accentBgDisabled =
-    department === 'poy' ? 'rgba(167,139,250,0.2)' : 'rgba(79,140,255,0.2)'
-  const placeholder =
-    department === 'poy'
-      ? 'Cerca nei documenti della filatura...'
-      : 'Cerca nei documenti del reparto...'
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Header */}
@@ -155,14 +155,14 @@ export default function Chat({ department }: ChatProps) {
               width: '36px',
               height: '36px',
               borderRadius: '10px',
-              backgroundColor: 'rgba(52,211,153,0.15)',
+              backgroundColor: 'rgba(167,139,250,0.15)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: '18px',
             }}
           >
-            📄
+            🔍
           </div>
           <div>
             <h2
@@ -174,12 +174,10 @@ export default function Chat({ department }: ChatProps) {
                 lineHeight: 1.2,
               }}
             >
-              Chat Documenti
+              Analisi Filiere
             </h2>
             <p style={{ color: '#9499b0', fontSize: '12px', margin: '3px 0 0' }}>
-              {department === 'poy'
-                ? 'Risposte basate sui documenti interni del reparto POY'
-                : 'Risposte basate sulla documentazione interna del reparto'}
+              Diagnosi stato · Punteggio salute · Manutenzione
             </p>
           </div>
         </div>
@@ -195,7 +193,7 @@ export default function Chat({ department }: ChatProps) {
         }}
       >
         {messages.map((message, index) => (
-          <MessageBubble key={index} message={message} mode="chat" />
+          <MessageBubble key={index} message={message} mode="filiere" />
         ))}
         <div ref={messagesEndRef} />
       </div>
@@ -209,24 +207,102 @@ export default function Chat({ department }: ChatProps) {
           flexShrink: 0,
         }}
       >
+        {/* Image preview */}
+        {imageFile && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              marginBottom: '8px',
+              padding: '6px 10px',
+              backgroundColor: 'rgba(167,139,250,0.1)',
+              borderRadius: '8px',
+              border: '1px solid rgba(167,139,250,0.2)',
+            }}
+          >
+            <span style={{ fontSize: '14px' }}>🖼️</span>
+            <span
+              style={{
+                color: '#a78bfa',
+                fontSize: '12px',
+                flex: 1,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {imageFile.name}
+            </span>
+            <button
+              onClick={() => setImageFile(null)}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#9499b0',
+                fontSize: '14px',
+                padding: '0 2px',
+                lineHeight: 1,
+              }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         <div
           style={{
             display: 'flex',
-            gap: '10px',
+            gap: '8px',
             alignItems: 'flex-end',
             backgroundColor: '#222536',
             borderRadius: '14px',
             border: '1px solid rgba(255,255,255,0.08)',
-            padding: '10px 12px 10px 16px',
-            transition: 'border-color 0.2s ease',
+            padding: '10px 10px 10px 14px',
           }}
         >
+          {/* Photo button */}
+          <button
+            onClick={() => imageInputRef.current?.click()}
+            disabled={isLoading}
+            title="Allega foto filiera"
+            style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '8px',
+              border: 'none',
+              cursor: isLoading ? 'not-allowed' : 'pointer',
+              backgroundColor: imageFile ? 'rgba(167,139,250,0.2)' : 'transparent',
+              color: imageFile ? '#a78bfa' : '#9499b0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              transition: 'all 0.2s ease',
+              fontSize: '16px',
+            }}
+          >
+            📷
+          </button>
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) setImageFile(file)
+              e.target.value = ''
+            }}
+          />
+
           <textarea
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={placeholder}
+            placeholder="Descrivi la filiera o carica una foto per l'analisi..."
             rows={1}
             disabled={isLoading}
             style={{
@@ -242,18 +318,20 @@ export default function Chat({ department }: ChatProps) {
               maxHeight: '120px',
               fontFamily: 'inherit',
             }}
-            className="placeholder-[#9499b0]"
           />
           <button
             onClick={sendMessage}
-            disabled={isLoading || !input.trim()}
+            disabled={isLoading || (!input.trim() && !imageFile)}
             style={{
               width: '36px',
               height: '36px',
               borderRadius: '10px',
               border: 'none',
-              cursor: isLoading || !input.trim() ? 'not-allowed' : 'pointer',
-              backgroundColor: isLoading || !input.trim() ? accentBgDisabled : accentColor,
+              cursor: isLoading || (!input.trim() && !imageFile) ? 'not-allowed' : 'pointer',
+              backgroundColor:
+                isLoading || (!input.trim() && !imageFile)
+                  ? 'rgba(167,139,250,0.2)'
+                  : '#a78bfa',
               color: '#ffffff',
               display: 'flex',
               alignItems: 'center',
@@ -287,7 +365,7 @@ export default function Chat({ department }: ChatProps) {
           </button>
         </div>
         <p style={{ color: '#9499b0', fontSize: '11px', marginTop: '8px', marginBottom: 0 }}>
-          Enter per inviare · Shift+Enter per andare a capo
+          Enter per inviare · 📷 per allegare foto filiera
         </p>
       </div>
 

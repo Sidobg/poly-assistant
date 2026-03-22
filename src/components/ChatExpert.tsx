@@ -7,27 +7,29 @@ import type { Department } from '@/app/page'
 const POLY_WELCOME: Message = {
   role: 'assistant',
   content:
-    'Ciao! Sono Poly Assistant, il tuo esperto AI per il reparto Polimerizzazione di Radici Yarn.\n\nPosso aiutarti con:\n• Domande su processi di polimerizzazione PA6/PA66\n• Informazioni dai manuali e procedure interne\n• Supporto su chimica dei polimeri e caprolattame\n• Troubleshooting impianti e macchinari\n\nCome posso aiutarti oggi?',
+    'Sono Poly Expert, esperto AI di chimica dei polimeri PA6/PA66, caprolattame, impiantistica chimica e meccanica industriale.\n\nRispondo dalle mie conoscenze tecniche su:\n• Chimica e cinetica di polimerizzazione\n• Reologia, cristallizzazione, degradazione\n• Reattori, colonne, scambiatori, pompe\n• Motori, riduttori, filtri, taglierine, essiccatori\n• Normative sicurezza impianti chimici\n\n⚠️ Le risposte vanno verificate con il responsabile.',
 }
 
 const POY_WELCOME: Message = {
   role: 'assistant',
   content:
-    "Sono l'assistente documentale delle linee di filatura. Rispondo basandomi sui manuali e documenti interni del reparto POY.\n\nPosso aiutarti con:\n• Documenti e procedure del reparto filatura\n• Manuali tecnici delle linee POY\n• Schede tecniche e parametri di processo\n• Procedure operative e di sicurezza\n\nCome posso aiutarti?",
+    'Sono Poly Expert — Filatura, esperto AI di filatura nylon PA6, PA66 e PA6.10.\n\nRispondo dalle mie conoscenze tecniche su:\n• Estrusione e filatura: fusione, pompe dosaggio, filiere, raffreddamento, stiro\n• Proprietà polimeri: viscosità fuso, cristallizzazione, orientazione molecolare\n• Filiere: design, materiali, geometria capillari, usura\n• Parametri di processo: temperature, velocità, rapporti di stiro\n• Difetti del filo: rotture, disuniformità, nodi — cause e soluzioni\n• Macchinari: estrusori, godet, winder, sistemi di raffreddamento\n\n⚠️ Le risposte vanno verificate con il responsabile.',
 }
 
-interface ChatProps {
+interface ChatExpertProps {
   department: Department
 }
 
-export default function Chat({ department }: ChatProps) {
+export default function ChatExpert({ department }: ChatExpertProps) {
   const [messages, setMessages] = useState<Message[]>([
     department === 'poy' ? POY_WELCOME : POLY_WELCOME,
   ])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [imageFile, setImageFile] = useState<File | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     setMessages([department === 'poy' ? POY_WELCOME : POLY_WELCOME])
@@ -41,9 +43,26 @@ export default function Chat({ department }: ChatProps) {
     const text = input.trim()
     if (!text || isLoading) return
 
-    const userMessage: Message = { role: 'user', content: text }
+    let imageBase64: string | null = null
+    let imageMediaType: string | null = null
+
+    if (imageFile) {
+      imageMediaType = imageFile.type
+      const buffer = await imageFile.arrayBuffer()
+      const bytes = new Uint8Array(buffer)
+      let binary = ''
+      for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i])
+      }
+      imageBase64 = btoa(binary)
+    }
+
+    const userContent = imageFile ? `[Immagine allegata: ${imageFile.name}]\n${text}` : text
+    const userMessage: Message = { role: 'user', content: userContent }
+
     setMessages((prev) => [...prev, userMessage])
     setInput('')
+    setImageFile(null)
     setIsLoading(true)
 
     const history = messages
@@ -54,10 +73,10 @@ export default function Chat({ department }: ChatProps) {
     setMessages((prev) => [...prev, { role: 'assistant', content: '', isStreaming: true }])
 
     try {
-      const response = await fetch('/api/chat', {
+      const response = await fetch('/api/chat-expert', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, history, department }),
+        body: JSON.stringify({ message: text, history, imageBase64, imageMediaType, department }),
       })
 
       if (!response.ok) throw new Error('Risposta del server non valida')
@@ -104,14 +123,13 @@ export default function Chat({ department }: ChatProps) {
         }
       }
     } catch (error) {
-      console.error('Errore chat:', error)
+      console.error('Errore chat expert:', error)
       setMessages((prev) =>
         prev.map((msg, i) =>
           i === assistantMessageIndex
             ? {
                 ...msg,
-                content:
-                  'Si è verificato un errore durante la generazione della risposta. Riprova tra poco.',
+                content: 'Si è verificato un errore. Riprova tra poco.',
                 isStreaming: false,
               }
             : msg
@@ -133,10 +151,19 @@ export default function Chat({ department }: ChatProps) {
   const accentColor = department === 'poy' ? '#a78bfa' : '#4f8cff'
   const accentBgDisabled =
     department === 'poy' ? 'rgba(167,139,250,0.2)' : 'rgba(79,140,255,0.2)'
+  const accentBgLight =
+    department === 'poy' ? 'rgba(167,139,250,0.15)' : 'rgba(79,140,255,0.15)'
+  const imageActiveBg =
+    department === 'poy' ? 'rgba(167,139,250,0.2)' : 'rgba(79,140,255,0.2)'
+  const title = department === 'poy' ? 'Chat Esperto Filatura' : 'Chat Esperto AI'
+  const subtitle =
+    department === 'poy'
+      ? 'Filatura nylon · Filiere · Qualità filo'
+      : 'Chimica polimeri · Impiantistica · Meccanica industriale'
   const placeholder =
     department === 'poy'
-      ? 'Cerca nei documenti della filatura...'
-      : 'Cerca nei documenti del reparto...'
+      ? "Chiedi all'esperto di filatura nylon..."
+      : "Chiedi all'esperto di chimica e impiantistica..."
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -155,14 +182,14 @@ export default function Chat({ department }: ChatProps) {
               width: '36px',
               height: '36px',
               borderRadius: '10px',
-              backgroundColor: 'rgba(52,211,153,0.15)',
+              backgroundColor: accentBgLight,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: '18px',
             }}
           >
-            📄
+            🧠
           </div>
           <div>
             <h2
@@ -174,13 +201,9 @@ export default function Chat({ department }: ChatProps) {
                 lineHeight: 1.2,
               }}
             >
-              Chat Documenti
+              {title}
             </h2>
-            <p style={{ color: '#9499b0', fontSize: '12px', margin: '3px 0 0' }}>
-              {department === 'poy'
-                ? 'Risposte basate sui documenti interni del reparto POY'
-                : 'Risposte basate sulla documentazione interna del reparto'}
-            </p>
+            <p style={{ color: '#9499b0', fontSize: '12px', margin: '3px 0 0' }}>{subtitle}</p>
           </div>
         </div>
       </div>
@@ -195,7 +218,7 @@ export default function Chat({ department }: ChatProps) {
         }}
       >
         {messages.map((message, index) => (
-          <MessageBubble key={index} message={message} mode="chat" />
+          <MessageBubble key={index} message={message} mode="expert" />
         ))}
         <div ref={messagesEndRef} />
       </div>
@@ -209,18 +232,96 @@ export default function Chat({ department }: ChatProps) {
           flexShrink: 0,
         }}
       >
+        {/* Image preview */}
+        {imageFile && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              marginBottom: '8px',
+              padding: '6px 10px',
+              backgroundColor: imageActiveBg,
+              borderRadius: '8px',
+              border: `1px solid ${accentColor}33`,
+            }}
+          >
+            <span style={{ fontSize: '14px' }}>🖼️</span>
+            <span
+              style={{
+                color: accentColor,
+                fontSize: '12px',
+                flex: 1,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {imageFile.name}
+            </span>
+            <button
+              onClick={() => setImageFile(null)}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#9499b0',
+                fontSize: '14px',
+                padding: '0 2px',
+                lineHeight: 1,
+              }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         <div
           style={{
             display: 'flex',
-            gap: '10px',
+            gap: '8px',
             alignItems: 'flex-end',
             backgroundColor: '#222536',
             borderRadius: '14px',
             border: '1px solid rgba(255,255,255,0.08)',
-            padding: '10px 12px 10px 16px',
-            transition: 'border-color 0.2s ease',
+            padding: '10px 10px 10px 14px',
           }}
         >
+          {/* Photo button */}
+          <button
+            onClick={() => imageInputRef.current?.click()}
+            disabled={isLoading}
+            title="Allega immagine (schema, P&ID...)"
+            style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '8px',
+              border: 'none',
+              cursor: isLoading ? 'not-allowed' : 'pointer',
+              backgroundColor: imageFile ? imageActiveBg : 'transparent',
+              color: imageFile ? accentColor : '#9499b0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              transition: 'all 0.2s ease',
+              fontSize: '16px',
+            }}
+          >
+            📷
+          </button>
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) setImageFile(file)
+              e.target.value = ''
+            }}
+          />
+
           <textarea
             ref={inputRef}
             value={input}
@@ -242,7 +343,6 @@ export default function Chat({ department }: ChatProps) {
               maxHeight: '120px',
               fontFamily: 'inherit',
             }}
-            className="placeholder-[#9499b0]"
           />
           <button
             onClick={sendMessage}
@@ -287,7 +387,7 @@ export default function Chat({ department }: ChatProps) {
           </button>
         </div>
         <p style={{ color: '#9499b0', fontSize: '11px', marginTop: '8px', marginBottom: 0 }}>
-          Enter per inviare · Shift+Enter per andare a capo
+          Enter per inviare · 📷 per allegare schema/P&ID
         </p>
       </div>
 

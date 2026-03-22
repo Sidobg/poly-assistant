@@ -6,8 +6,12 @@ create table documents (
   id bigserial primary key,
   name text not null,
   type text, -- 'pdf', 'docx', 'xlsx'
+  department text default 'poly', -- 'poly' | 'poy'
   created_at timestamp with time zone default now()
 );
+
+-- Migrazione: aggiunge colonna department se non esiste (eseguire sul DB esistente)
+-- ALTER TABLE documents ADD COLUMN IF NOT EXISTS department text DEFAULT 'poly';
 
 -- Tabella chunks con embeddings
 create table document_chunks (
@@ -29,9 +33,10 @@ alter table document_chunks add column fts tsvector
 -- Indice full-text
 create index on document_chunks using gin(fts);
 
--- Funzione di ricerca full-text
+-- Funzione di ricerca full-text con filtro per reparto
 create or replace function search_documents(
   search_query text,
+  dept text default 'poly',
   match_count int default 10
 )
 returns table (
@@ -54,6 +59,7 @@ begin
   from document_chunks dc
   join documents d on d.id = dc.document_id
   where dc.fts @@ websearch_to_tsquery('italian', search_query)
+    and d.department = dept
   order by rank desc
   limit match_count;
 end;

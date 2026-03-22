@@ -20,7 +20,8 @@ function splitIntoChunks(text: string, chunkSize = 500, overlap = 50): string[] 
 async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   const { PDFParse } = await import('pdf-parse')
   const parser = new PDFParse({ data: buffer })
-  await parser.load()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (parser as any).load()
   const result = await parser.getText()
   return result.text
 }
@@ -39,6 +40,8 @@ export async function POST(request: NextRequest) {
     if (!file) {
       return NextResponse.json({ error: 'Nessun file fornito' }, { status: 400 })
     }
+
+    const department = (formData.get('department') as string) || 'poly'
 
     const fileType = file.name.toLowerCase().endsWith('.pdf') ? 'pdf'
                    : file.name.toLowerCase().endsWith('.docx') ? 'docx'
@@ -70,7 +73,7 @@ export async function POST(request: NextRequest) {
     // Salva il documento nel database
     const { data: document, error: docError } = await supabaseAdmin
       .from('documents')
-      .insert({ name: file.name, type: fileType })
+      .insert({ name: file.name, type: fileType, department })
       .select()
       .single()
 
@@ -120,11 +123,15 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url)
+    const department = searchParams.get('department') || 'poly'
+
     const { data: documents, error } = await supabaseAdmin
       .from('documents')
       .select('id, name, type, created_at')
+      .eq('department', department)
       .order('created_at', { ascending: false })
 
     if (error) {

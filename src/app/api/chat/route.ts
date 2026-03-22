@@ -22,7 +22,7 @@ CONTESTO DAI DOCUMENTI INTERNI:
 
 export async function POST(request: NextRequest) {
   try {
-    const { message, history = [] } = await request.json()
+    const { message, history = [], department = 'poly' } = await request.json()
 
     if (!message || typeof message !== 'string') {
       return NextResponse.json({ error: 'Messaggio non valido' }, { status: 400 })
@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
       const { data: ftsResults, error: ftsError } = await supabaseAdmin
         .rpc('search_documents', {
           search_query: message,
+          dept: department,
           match_count: 8,
         })
 
@@ -58,6 +59,7 @@ export async function POST(request: NextRequest) {
           const { data: likeResults, error: likeError } = await supabaseAdmin
             .from('document_chunks')
             .select('content, documents!inner(name)')
+            .eq('documents.department', department)
             .ilike('content', likePattern)
             .limit(5)
 
@@ -79,6 +81,7 @@ export async function POST(request: NextRequest) {
           const { data: fallbackChunks } = await supabaseAdmin
             .from('document_chunks')
             .select('content, documents!inner(name)')
+            .eq('documents.department', department)
             .order('id', { ascending: false })
             .limit(5)
 

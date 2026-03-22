@@ -18,11 +18,11 @@ function splitIntoChunks(text: string, chunkSize = 500, overlap = 50): string[] 
 }
 
 async function extractTextFromPDF(buffer: Buffer): Promise<string> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const pdfParseModule = (await import('pdf-parse')) as any
-  const pdfParse = pdfParseModule.default ?? pdfParseModule
-  const data = await pdfParse(buffer)
-  return data.text
+  const { PDFParse } = await import('pdf-parse')
+  const parser = new PDFParse({ data: buffer })
+  await parser.load()
+  const result = await parser.getText()
+  return result.text
 }
 
 async function extractTextFromDOCX(buffer: Buffer): Promise<string> {

@@ -28,25 +28,71 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Messaggio non valido' }, { status: 400 })
     }
 
-    // Cerca documenti rilevanti con full-text search
+    // Cerca documenti rilevanti con full-text search + fallback ILIKE
     let context = 'Nessun documento interno pertinente trovato.'
 
     try {
-      const { data: searchResults, error: searchError } = await supabaseAdmin
+      // 1. Prova full-text search
+      const { data: ftsResults, error: ftsError } = await supabaseAdmin
         .rpc('search_documents', {
           search_query: message,
           match_count: 8,
         })
 
-      if (!searchError && searchResults && searchResults.length > 0) {
-        const contextParts = searchResults.map((r: { document_name: string; content: string }, i: number) =>
+      if (!ftsError && ftsResults && ftsResults.length > 0) {
+        const contextParts = ftsResults.map((r: { document_name: string; content: string }) =>
           `[Documento: ${r.document_name}]\n${r.content}`
         )
         context = contextParts.join('\n\n---\n\n')
+      } else {
+        // 2. Fallback: cerca con ILIKE su parole chiave della domanda
+        const keywords = message
+          .toLowerCase()
+          .replace(/[^a-zàèéìòùA-Z0-9\s]/g, ' ')
+          .split(/\s+/)
+          .filter(w => w.length > 3)
+          .slice(0, 3)
+
+        if (keywords.length > 0) {
+          const likePattern = `%${keywords[0]}%`
+          const { data: likeResults, error: likeError } = await supabaseAdmin
+            .from('document_chunks')
+            .select('content, documents!inner(name)')
+            .ilike('content', likePattern)
+            .limit(5)
+
+          if (!likeError && likeResults && likeResults.length > 0) {
+            const contextParts = likeResults.map((r: { content: string; documents: { name: string } | { name: string }[] }) => {
+              const docName = Array.isArray(r.documents) ? r.documents[0]?.name : r.documents?.name
+              return `[Documento: ${docName}]\n${r.content}`
+            })
+            context = contextParts.join('\n\n---\n\n')
+          }
+        }
+
+        if (ftsError) {
+          console.error('FTS error:', ftsError)
+        }
+
+        // 3. Fallback finale: invia i chunk più recenti come contesto generico
+        if (context === 'Nessun documento interno pertinente trovato.') {
+          const { data: fallbackChunks } = await supabaseAdmin
+            .from('document_chunks')
+            .select('content, documents!inner(name)')
+            .order('id', { ascending: false })
+            .limit(5)
+
+          if (fallbackChunks && fallbackChunks.length > 0) {
+            const contextParts = fallbackChunks.map((r: { content: string; documents: { name: string } | { name: string }[] }) => {
+              const docName = Array.isArray(r.documents) ? r.documents[0]?.name : r.documents?.name
+              return `[Documento: ${docName}]\n${r.content}`
+            })
+            context = contextParts.join('\n\n---\n\n')
+          }
+        }
       }
     } catch (searchError) {
       console.error('Errore ricerca documenti:', searchError)
-      // Continua senza contesto
     }
 
     const systemPrompt = SYSTEM_PROMPT.replace('{context}', context)

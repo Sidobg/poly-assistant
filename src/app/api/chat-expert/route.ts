@@ -1,9 +1,6 @@
-import Anthropic from '@anthropic-ai/sdk'
-import { NextRequest, NextResponse } from 'next/server'
+export const runtime = 'edge'
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-})
+import { NextRequest, NextResponse } from 'next/server'
 
 const METHOD_BLOCK = `
 IL TUO METODO DI LAVORO:
@@ -210,30 +207,64 @@ export async function POST(request: NextRequest) {
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          const response = await anthropic.messages.create({
-            model: 'claude-sonnet-4-20250514',
-            max_tokens: 4096,
-            system: systemPrompt,
-            messages,
-            stream: true,
+          const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': process.env.ANTHROPIC_API_KEY!,
+              'anthropic-version': '2023-06-01',
+            },
+            body: JSON.stringify({
+              model: 'claude-sonnet-4-6',
+              max_tokens: 2048,
+              system: systemPrompt,
+              messages,
+              stream: true,
+            }),
           })
 
-          for await (const event of response) {
-            if (
-              event.type === 'content_block_delta' &&
-              event.delta.type === 'text_delta'
-            ) {
-              controller.enqueue(
-                encoder.encode(
-                  `data: ${JSON.stringify({ type: 'text', content: event.delta.text })}\n\n`
-                )
-              )
+          if (!anthropicRes.ok || !anthropicRes.body) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', content: `API error: ${anthropicRes.status}` })}\n\n`))
+            controller.close()
+            return
+          }
+
+          const reader = anthropicRes.body.getReader()
+          const decoder = new TextDecoder()
+          let buffer = ''
+          let doneSent = false
+
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+
+            buffer += decoder.decode(value, { stream: true })
+            const lines = buffer.split('\n')
+            buffer = lines.pop() ?? ''
+
+            for (const line of lines) {
+              if (!line.startsWith('data: ')) continue
+              const data = line.slice(6).trim()
+              if (!data) continue
+              try {
+                const event = JSON.parse(data)
+                if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
+                  controller.enqueue(encoder.encode(
+                    `data: ${JSON.stringify({ type: 'text', content: event.delta.text })}\n\n`
+                  ))
+                } else if (event.type === 'message_stop') {
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`))
+                  doneSent = true
+                }
+              } catch {
+                // skip malformed JSON
+              }
             }
           }
 
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`)
-          )
+          if (!doneSent) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`))
+          }
           controller.close()
         } catch (error) {
           const msg = error instanceof Error ? error.message : 'Errore sconosciuto'

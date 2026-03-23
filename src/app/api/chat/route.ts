@@ -1,10 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
-import { supabaseAdmin } from '@/lib/supabase'
+export const runtime = 'edge'
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY!,
-})
+import { NextRequest, NextResponse } from 'next/server'
+import { supabaseAdmin } from '@/lib/supabase'
 
 const SYSTEM_PROMPT = `Sei Poly Assistant, l'assistente AI del reparto Polimerizzazione di Radici Yarn — stabilimento di Villa d'Ogna (BG).
 Rispondi come un collega esperto di reparto: pratico, diretto, con riferimenti specifici a macchinari, quote, e procedure reali dell'impianto.
@@ -168,7 +165,7 @@ export async function POST(request: NextRequest) {
     const systemPrompt = SYSTEM_PROMPT.replace('{context}', context)
 
     // Costruisci la cronologia messaggi
-    const messages: Anthropic.MessageParam[] = [
+    const messages: { role: 'user' | 'assistant'; content: string }[] = [
       ...history.slice(-10), // Mantieni solo gli ultimi 10 messaggi
       { role: 'user', content: message }
     ]
@@ -179,27 +176,68 @@ export async function POST(request: NextRequest) {
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          const anthropicStream = await anthropic.messages.stream({
-            model: 'claude-sonnet-4-20250514',
-            max_tokens: 4096,
-            system: systemPrompt,
-            messages,
+          const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': process.env.ANTHROPIC_API_KEY!,
+              'anthropic-version': '2023-06-01',
+            },
+            body: JSON.stringify({
+              model: 'claude-sonnet-4-6',
+              max_tokens: 2048,
+              system: systemPrompt,
+              messages,
+              stream: true,
+            }),
           })
 
-          for await (const event of anthropicStream) {
-            if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-              const data = JSON.stringify({ type: 'text', content: event.delta.text })
-              controller.enqueue(encoder.encode(`data: ${data}\n\n`))
+          if (!anthropicRes.ok || !anthropicRes.body) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', content: `API error: ${anthropicRes.status}` })}\n\n`))
+            controller.close()
+            return
+          }
+
+          const reader = anthropicRes.body.getReader()
+          const decoder = new TextDecoder()
+          let buffer = ''
+          let doneSent = false
+
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+
+            buffer += decoder.decode(value, { stream: true })
+            const lines = buffer.split('\n')
+            buffer = lines.pop() ?? ''
+
+            for (const line of lines) {
+              if (!line.startsWith('data: ')) continue
+              const data = line.slice(6).trim()
+              if (!data) continue
+              try {
+                const event = JSON.parse(data)
+                if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
+                  controller.enqueue(encoder.encode(
+                    `data: ${JSON.stringify({ type: 'text', content: event.delta.text })}\n\n`
+                  ))
+                } else if (event.type === 'message_stop') {
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`))
+                  doneSent = true
+                }
+              } catch {
+                // skip malformed JSON
+              }
             }
           }
 
-          // Segnala la fine dello stream
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`))
+          if (!doneSent) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`))
+          }
           controller.close()
         } catch (streamError) {
-          console.error('Errore streaming:', streamError)
-          const errorData = JSON.stringify({ type: 'error', content: 'Errore durante la generazione della risposta' })
-          controller.enqueue(encoder.encode(`data: ${errorData}\n\n`))
+          const msg = streamError instanceof Error ? streamError.message : 'Errore sconosciuto'
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', content: msg })}\n\n`))
           controller.close()
         }
       }

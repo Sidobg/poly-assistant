@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, CSSProperties } from 'react'
 import Sidebar from '@/components/Sidebar'
 import Chat from '@/components/Chat'
 import ChatExpert from '@/components/ChatExpert'
@@ -9,6 +9,24 @@ import Upload from '@/components/Upload'
 
 export type Department = 'poly' | 'poy'
 export type Section = 'chat' | 'expert' | 'upload' | 'filiere'
+
+const cardBase: CSSProperties = {
+  display: 'block',
+  width: '280px',
+  padding: '36px 28px',
+  borderRadius: '20px',
+  backgroundColor: '#1a1d27',
+  cursor: 'pointer',
+  textAlign: 'left',
+  fontFamily: 'inherit',
+  fontSize: 'inherit',
+  touchAction: 'manipulation',
+  WebkitTapHighlightColor: 'transparent',
+  userSelect: 'none',
+  outline: 'none',
+  position: 'relative',
+  zIndex: 10,
+}
 
 function DepartmentSelect({ onSelect }: { onSelect: (dept: Department) => void }) {
   return (
@@ -23,218 +41,56 @@ function DepartmentSelect({ onSelect }: { onSelect: (dept: Department) => void }
         padding: '24px',
       }}
     >
-      {/* Logo Radici Group */}
-      <div style={{ marginBottom: '32px' }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/RadiciGroup%20logo.jpg"
-          alt="Radici Group"
-          style={{ maxHeight: '52px', objectFit: 'contain' }}
-        />
-      </div>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/RadiciGroup%20logo.jpg"
+        alt="Radici Group"
+        style={{ maxHeight: '52px', objectFit: 'contain', marginBottom: '32px', pointerEvents: 'none' }}
+      />
 
-      {/* Title */}
-      <h1
-        style={{
-          color: '#e8eaf0',
-          fontSize: '28px',
-          fontWeight: 700,
-          margin: '0 0 8px',
-          textAlign: 'center',
-        }}
-      >
+      <h1 style={{ color: '#e8eaf0', fontSize: '28px', fontWeight: 700, margin: '0 0 8px', textAlign: 'center' }}>
         Poly Assistant
       </h1>
-      <p
-        style={{
-          color: '#9499b0',
-          fontSize: '15px',
-          margin: '0 0 48px',
-          textAlign: 'center',
-        }}
-      >
+      <p style={{ color: '#9499b0', fontSize: '15px', margin: '0 0 48px', textAlign: 'center' }}>
         Seleziona il reparto
       </p>
 
-      {/* Department cards */}
-      <div
-        style={{
-          display: 'flex',
-          gap: '24px',
-          flexWrap: 'wrap',
-          justifyContent: 'center',
-        }}
-      >
-        {/* POLY card */}
+      <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', justifyContent: 'center' }}>
+
         <button
+          type="button"
           className="dept-card dept-card-poly"
+          style={{ ...cardBase, border: '2px solid rgba(79,140,255,0.2)' }}
           onClick={() => onSelect('poly')}
-          style={{
-            width: '280px',
-            padding: '36px 28px',
-            borderRadius: '20px',
-            border: '2px solid rgba(79,140,255,0.2)',
-            backgroundColor: '#1a1d27',
-            cursor: 'pointer',
-            textAlign: 'left',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '16px',
-            transition: 'all 0.25s ease',
-            fontFamily: 'inherit',
-          }}
+          onTouchStart={() => onSelect('poly')}
         >
-          <div
-            style={{
-              width: '56px',
-              height: '56px',
-              borderRadius: '16px',
-              backgroundColor: 'rgba(79,140,255,0.15)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '28px',
-            }}
-          >
-            ⚗️
-          </div>
-          <div>
-            <div
-              style={{
-                color: '#4f8cff',
-                fontSize: '12px',
-                fontWeight: 700,
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                marginBottom: '6px',
-              }}
-            >
-              POLY
-            </div>
-            <div
-              style={{
-                color: '#e8eaf0',
-                fontSize: '18px',
-                fontWeight: 700,
-                marginBottom: '10px',
-              }}
-            >
-              Polimerizzazione
-            </div>
-            <div style={{ color: '#9499b0', fontSize: '13px', lineHeight: 1.5 }}>
-              Assistente AI per il reparto polimerizzazione PA6/PA66
-            </div>
-          </div>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              color: '#4f8cff',
-              fontSize: '13px',
-              fontWeight: 500,
-            }}
-          >
-            <span>Entra</span>
-            <span>→</span>
-          </div>
+          <p style={{ margin: '0 0 16px', fontSize: '28px', pointerEvents: 'none' }}>⚗️</p>
+          <p style={{ margin: '0 0 6px', color: '#4f8cff', fontSize: '12px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', pointerEvents: 'none' }}>POLY</p>
+          <p style={{ margin: '0 0 10px', color: '#e8eaf0', fontSize: '18px', fontWeight: 700, pointerEvents: 'none' }}>Polimerizzazione</p>
+          <p style={{ margin: '0 0 16px', color: '#9499b0', fontSize: '13px', lineHeight: 1.5, pointerEvents: 'none' }}>Assistente AI per il reparto polimerizzazione PA6/PA66</p>
+          <p style={{ margin: 0, color: '#4f8cff', fontSize: '13px', fontWeight: 500, pointerEvents: 'none' }}>Entra →</p>
         </button>
 
-        {/* POY card */}
         <button
+          type="button"
           className="dept-card dept-card-poy"
+          style={{ ...cardBase, border: '2px solid rgba(167,139,250,0.2)' }}
           onClick={() => onSelect('poy')}
-          style={{
-            width: '280px',
-            padding: '36px 28px',
-            borderRadius: '20px',
-            border: '2px solid rgba(167,139,250,0.2)',
-            backgroundColor: '#1a1d27',
-            cursor: 'pointer',
-            textAlign: 'left',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '16px',
-            transition: 'all 0.25s ease',
-            fontFamily: 'inherit',
-          }}
+          onTouchStart={() => onSelect('poy')}
         >
-          <div
-            style={{
-              width: '56px',
-              height: '56px',
-              borderRadius: '16px',
-              backgroundColor: 'rgba(167,139,250,0.15)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '28px',
-            }}
-          >
-            🧵
-          </div>
-          <div>
-            <div
-              style={{
-                color: '#a78bfa',
-                fontSize: '12px',
-                fontWeight: 700,
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                marginBottom: '6px',
-              }}
-            >
-              POY
-            </div>
-            <div
-              style={{
-                color: '#e8eaf0',
-                fontSize: '18px',
-                fontWeight: 700,
-                marginBottom: '10px',
-              }}
-            >
-              Filatura
-            </div>
-            <div style={{ color: '#9499b0', fontSize: '13px', lineHeight: 1.5 }}>
-              Assistente AI per le linee di filatura nylon
-            </div>
-          </div>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              color: '#a78bfa',
-              fontSize: '13px',
-              fontWeight: 500,
-            }}
-          >
-            <span>Entra</span>
-            <span>→</span>
-          </div>
+          <p style={{ margin: '0 0 16px', fontSize: '28px', pointerEvents: 'none' }}>🧵</p>
+          <p style={{ margin: '0 0 6px', color: '#a78bfa', fontSize: '12px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', pointerEvents: 'none' }}>POY</p>
+          <p style={{ margin: '0 0 10px', color: '#e8eaf0', fontSize: '18px', fontWeight: 700, pointerEvents: 'none' }}>Filatura</p>
+          <p style={{ margin: '0 0 16px', color: '#9499b0', fontSize: '13px', lineHeight: 1.5, pointerEvents: 'none' }}>Assistente AI per le linee di filatura nylon</p>
+          <p style={{ margin: 0, color: '#a78bfa', fontSize: '13px', fontWeight: 500, pointerEvents: 'none' }}>Entra →</p>
         </button>
+
       </div>
 
-      {/* Footer */}
-      <div
-        style={{
-          position: 'fixed',
-          bottom: '24px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-        }}
-      >
+      <div style={{ marginTop: '48px', display: 'flex', alignItems: 'center', gap: '10px' }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/future%20ai%20logo.png"
-          alt="FutureAI"
-          style={{ width: '24px', height: '24px', objectFit: 'contain', borderRadius: '6px' }}
-        />
-        <span style={{ color: '#9499b0', fontSize: '12px' }}>
-          Powered by FutureAI — Automazioni AI per Aziende
-        </span>
+        <img src="/future%20ai%20logo.png" alt="FutureAI" style={{ width: '24px', height: '24px', objectFit: 'contain', borderRadius: '6px', pointerEvents: 'none' }} />
+        <span style={{ color: '#9499b0', fontSize: '12px' }}>Powered by FutureAI — Automazioni AI per Aziende</span>
       </div>
     </div>
   )

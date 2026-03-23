@@ -7,6 +7,8 @@ interface SidebarProps {
   onSectionChange: (section: Section) => void
   department: Department
   onChangeDepartment: () => void
+  isMobileOpen?: boolean
+  onMobileClose?: () => void
 }
 
 const POLY_NAV = [
@@ -43,6 +45,8 @@ export default function Sidebar({
   onSectionChange,
   department,
   onChangeDepartment,
+  isMobileOpen,
+  onMobileClose,
 }: SidebarProps) {
   const navGroups = department === 'poy' ? POY_NAV : POLY_NAV
   const accentColor = department === 'poy' ? '#a78bfa' : '#4f8cff'
@@ -50,6 +54,7 @@ export default function Sidebar({
 
   return (
     <aside
+      className={`sidebar${isMobileOpen ? ' sidebar--open' : ''}`}
       style={{
         width: '260px',
         minWidth: '260px',
@@ -68,28 +73,50 @@ export default function Sidebar({
           borderBottom: '1px solid rgba(255,255,255,0.06)',
         }}
       >
-        {/* Back button */}
-        <button
-          onClick={onChangeDepartment}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            color: '#9499b0',
-            fontSize: '12px',
-            padding: '4px 0',
-            marginBottom: '14px',
-            fontFamily: 'inherit',
-            transition: 'color 0.2s',
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = '#e8eaf0')}
-          onMouseLeave={(e) => (e.currentTarget.style.color = '#9499b0')}
-        >
-          ← Cambia reparto
-        </button>
+        {/* Mobile close + Back row */}
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '14px' }}>
+          <button
+            onClick={onChangeDepartment}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: '#9499b0',
+              fontSize: '12px',
+              padding: '4px 0',
+              fontFamily: 'inherit',
+              transition: 'color 0.2s',
+              flex: 1,
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = '#e8eaf0')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = '#9499b0')}
+          >
+            ← Cambia reparto
+          </button>
+          {/* Close button — mobile only */}
+          <button
+            className="sidebar-mobile-close"
+            onClick={onMobileClose}
+            style={{
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'rgba(255,255,255,0.06)',
+              border: 'none',
+              borderRadius: '8px',
+              color: '#9499b0',
+              cursor: 'pointer',
+              width: '32px',
+              height: '32px',
+              fontSize: '18px',
+              flexShrink: 0,
+            }}
+          >
+            ✕
+          </button>
+        </div>
 
         <div
           style={{ marginBottom: '12px', height: '36px', display: 'flex', alignItems: 'center' }}

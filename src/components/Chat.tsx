@@ -249,6 +249,7 @@ export default function Chat({ department }: ChatProps) {
 
       {/* Messages */}
       <div
+        className="chat-messages-area"
         style={{
           flex: 1,
           overflowY: 'auto',
@@ -264,6 +265,7 @@ export default function Chat({ department }: ChatProps) {
 
       {/* Input area */}
       <div
+        className="chat-input-area"
         style={{
           padding: '16px 28px 20px',
           borderTop: '1px solid rgba(255,255,255,0.06)',

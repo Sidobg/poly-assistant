@@ -38,7 +38,7 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
       justifyContent: 'center',
       padding: '20px',
     }}>
-      <div style={{
+      <div className="auth-card" style={{
         width: '100%',
         maxWidth: '380px',
         background: '#1a1d27',
@@ -251,6 +251,7 @@ export default function Home() {
   const [currentView, setCurrentView] = useState<'select' | 'app'>('select')
   const [department, setDepartment] = useState<Department>('poly')
   const [activeSection, setActiveSection] = useState<Section>('chat')
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   const handleLogin = () => {
     setIsLoggedIn(true)
@@ -262,6 +263,11 @@ export default function Home() {
     setCurrentView('app')
   }
 
+  const handleSectionChange = (section: Section) => {
+    setActiveSection(section)
+    setIsMobileMenuOpen(false)
+  }
+
   if (!isLoggedIn) {
     return <LoginScreen onLogin={handleLogin} />
   }
@@ -270,21 +276,74 @@ export default function Home() {
     return <DepartmentSelect onSelect={handleSelectDepartment} />
   }
 
+  const sectionLabels: Record<Section, string> = {
+    chat: department === 'poy' ? 'Chat Documenti POY' : 'Chat Documenti',
+    expert: department === 'poy' ? 'Chat Esperto Filatura' : 'Chat Esperto AI',
+    filiere: 'Analisi Filiere',
+    upload: 'Carica Documenti',
+  }
+  const accentColor = department === 'poy' ? '#a78bfa' : '#4f8cff'
+
   return (
     <div
       className="flex h-screen overflow-hidden"
       style={{ backgroundColor: '#0f1117', color: '#e8eaf0' }}
     >
+      {/* Mobile backdrop */}
+      {isMobileMenuOpen && (
+        <div
+          className="mobile-backdrop"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
       <Sidebar
         activeSection={activeSection}
-        onSectionChange={setActiveSection}
+        onSectionChange={handleSectionChange}
         department={department}
         onChangeDepartment={() => setCurrentView('select')}
+        isMobileOpen={isMobileMenuOpen}
+        onMobileClose={() => setIsMobileMenuOpen(false)}
       />
+
       <main
         className="flex-1 flex flex-col overflow-hidden"
         style={{ backgroundColor: '#0f1117' }}
       >
+        {/* Mobile top bar */}
+        <div className="mobile-topbar">
+          <button
+            onClick={() => setIsMobileMenuOpen(true)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#e8eaf0',
+              fontSize: '20px',
+              cursor: 'pointer',
+              padding: '4px 6px',
+              borderRadius: '8px',
+              lineHeight: 1,
+              flexShrink: 0,
+            }}
+          >
+            ☰
+          </button>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ margin: 0, color: '#e8eaf0', fontWeight: 600, fontSize: '14px', lineHeight: 1.2 }}>
+              {sectionLabels[activeSection]}
+            </p>
+            <p style={{ margin: 0, color: accentColor, fontSize: '11px', fontWeight: 600 }}>
+              {department === 'poy' ? 'POY — Filatura Nylon' : 'POLY — Polimerizzazione'}
+            </p>
+          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/RadiciGroup%20logo.jpg"
+            alt="Radici Group"
+            style={{ height: '28px', objectFit: 'contain', flexShrink: 0 }}
+          />
+        </div>
+
         {activeSection === 'chat' && <Chat department={department} />}
         {activeSection === 'expert' && <ChatExpert department={department} />}
         {activeSection === 'filiere' && department === 'poy' && <ChatFiliere />}

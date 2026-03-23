@@ -27,9 +27,6 @@ body {
   color: var(--text-primary);
 }
 
-/* DEBUG: rimuovere dopo fix */
-* { outline: 1px solid red !important; }
-
 * {
   box-sizing: border-box;
   -webkit-font-smoothing: antialiased;

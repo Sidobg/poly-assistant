@@ -7,13 +7,13 @@ import type { Department } from '@/app/page'
 const POLY_WELCOME: Message = {
   role: 'assistant',
   content:
-    'Sono Poly Expert, esperto AI di chimica dei polimeri PA6/PA66, caprolattame, impiantistica chimica e meccanica industriale.\n\nRispondo dalle mie conoscenze tecniche su:\n• Chimica e cinetica di polimerizzazione\n• Reologia, cristallizzazione, degradazione\n• Reattori, colonne, scambiatori, pompe\n• Motori, riduttori, filtri, taglierine, essiccatori\n• Normative sicurezza impianti chimici\n\n⚠️ Le risposte vanno verificate con il responsabile.',
+    'Sono Poly Expert, consulente tecnico senior specializzato nella polimerizzazione di poliammidi.\n\nLavoro come un medico specialista: prima ti faccio alcune domande per capire bene il contesto, poi fornisco una diagnosi strutturata con cause, soluzioni operative e prevenzione.\n\nHo expertise profonda in:\n• Chimica PA6/PA66: cinetica, equilibri, degradazione, additivi\n• Processo: VK tube, viscosità, dosaggio, estrazione, essiccamento\n• Concentrazione lattame: evaporazione multi-stadio\n• Meccanica: pompe, filtri, taglierine, caldaie, valvole\n\n⚠️ Le risposte vanno verificate con il responsabile di impianto.',
 }
 
 const POY_WELCOME: Message = {
   role: 'assistant',
   content:
-    'Sono Poly Expert — Filatura, esperto AI di filatura nylon PA6, PA66 e PA6.10.\n\nRispondo dalle mie conoscenze tecniche su:\n• Estrusione e filatura: fusione, pompe dosaggio, filiere, raffreddamento, stiro\n• Proprietà polimeri: viscosità fuso, cristallizzazione, orientazione molecolare\n• Filiere: design, materiali, geometria capillari, usura\n• Parametri di processo: temperature, velocità, rapporti di stiro\n• Difetti del filo: rotture, disuniformità, nodi — cause e soluzioni\n• Macchinari: estrusori, godet, winder, sistemi di raffreddamento\n\n⚠️ Le risposte vanno verificate con il responsabile.',
+    'Sono Poly Expert — Filatura, consulente tecnico senior specializzato nella filatura di poliammidi.\n\nLavoro come un medico specialista: prima ti faccio alcune domande per capire bene il contesto, poi fornisco una diagnosi strutturata con cause, soluzioni operative e prevenzione.\n\nHo expertise profonda in:\n• Estrusione e filatura: parametri, raffreddamento, stiro, bobinatura\n• Filiere: design, usura capillari, pulizia, vita utile\n• Difetti del filo: rotture, disuniformità, nodi — diagnosi sistematica\n• Controllo qualità: dtex, tenacità, allungamento, Uster\n\n⚠️ Le risposte vanno verificate con il responsabile di reparto.',
 }
 
 interface ChatExpertProps {
@@ -21,9 +21,10 @@ interface ChatExpertProps {
 }
 
 export default function ChatExpert({ department }: ChatExpertProps) {
-  const [messages, setMessages] = useState<Message[]>([
-    department === 'poy' ? POY_WELCOME : POLY_WELCOME,
-  ])
+  const storageKey = `poly-chat-expert-${department}`
+  const welcomeMessage = department === 'poy' ? POY_WELCOME : POLY_WELCOME
+
+  const [messages, setMessages] = useState<Message[]>([welcomeMessage])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [imageFile, setImageFile] = useState<File | null>(null)
@@ -31,13 +32,60 @@ export default function ChatExpert({ department }: ChatExpertProps) {
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
 
+  // Load from localStorage when department changes
   useEffect(() => {
-    setMessages([department === 'poy' ? POY_WELCOME : POLY_WELCOME])
-  }, [department])
+    try {
+      const saved = localStorage.getItem(storageKey)
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMessages(parsed)
+          return
+        }
+      }
+    } catch {}
+    setMessages([welcomeMessage])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageKey])
+
+  // Save to localStorage when messages change
+  useEffect(() => {
+    if (messages.length > 0) {
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(messages))
+      } catch {}
+    }
+  }, [messages, storageKey])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  const clearConversation = () => {
+    if (window.confirm('Vuoi cancellare la conversazione corrente?')) {
+      localStorage.removeItem(storageKey)
+      setMessages([welcomeMessage])
+    }
+  }
+
+  const exportPDF = () => {
+    const date = new Date().toLocaleDateString('it-IT')
+    const chatName = department === 'poy' ? 'Chat Esperto Filatura' : 'Chat Esperto AI'
+    const content = messages
+      .map(msg => {
+        const role = msg.role === 'user' ? 'Utente' : 'Assistente'
+        const text = msg.content.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')
+        return `<div class="message ${msg.role}"><div class="role">${role}</div><div class="content">${text}</div></div>`
+      })
+      .join('')
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Poly Assistant — ${chatName} — ${date}</title><style>body{font-family:Arial,sans-serif;max-width:800px;margin:0 auto;padding:20px;color:#333}.header{text-align:center;border-bottom:2px solid #333;padding-bottom:20px;margin-bottom:30px}.header h1{margin:0 0 5px;font-size:24px}.header p{margin:0;color:#666}.message{margin-bottom:20px;padding:15px;border-radius:8px}.message.user{background:#f0f4ff;border-left:4px solid #4f8cff}.message.assistant{background:#f8f8f8;border-left:4px solid #34d399}.role{font-weight:bold;margin-bottom:8px;font-size:12px;text-transform:uppercase;color:#666}.content{line-height:1.6}.footer{text-align:center;margin-top:40px;padding-top:20px;border-top:1px solid #ccc;color:#666;font-size:12px}</style></head><body><div class="header"><h1>Poly Assistant</h1><p>${chatName} — ${date}</p></div>${content}<div class="footer">Powered by FutureAI — Automazioni AI per Aziende</div></body></html>`
+    const win = window.open('', '_blank')
+    if (win) {
+      win.document.write(html)
+      win.document.close()
+      win.print()
+    }
+  }
 
   const sendMessage = async () => {
     const text = input.trim()
@@ -165,18 +213,31 @@ export default function ChatExpert({ department }: ChatExpertProps) {
       ? "Chiedi all'esperto di filatura nylon..."
       : "Chiedi all'esperto di chimica e impiantistica..."
 
+  const btnStyle = {
+    padding: '6px 12px',
+    background: 'rgba(255,255,255,0.05)',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: '8px',
+    color: '#9499b0',
+    fontSize: '12px',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap' as const,
+    WebkitAppearance: 'none' as const,
+    fontFamily: 'inherit',
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Header */}
       <div
         style={{
-          padding: '18px 28px',
+          padding: '14px 20px',
           borderBottom: '1px solid rgba(255,255,255,0.06)',
           backgroundColor: '#1a1d27',
           flexShrink: 0,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div
             style={{
               width: '36px',
@@ -187,23 +248,24 @@ export default function ChatExpert({ department }: ChatExpertProps) {
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: '18px',
+              flexShrink: 0,
             }}
           >
             🧠
           </div>
-          <div>
-            <h2
-              style={{
-                color: '#e8eaf0',
-                fontWeight: 600,
-                fontSize: '16px',
-                margin: 0,
-                lineHeight: 1.2,
-              }}
-            >
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h2 style={{ color: '#e8eaf0', fontWeight: 600, fontSize: '15px', margin: 0, lineHeight: 1.2 }}>
               {title}
             </h2>
-            <p style={{ color: '#9499b0', fontSize: '12px', margin: '3px 0 0' }}>{subtitle}</p>
+            <p style={{ color: '#9499b0', fontSize: '11px', margin: '2px 0 0' }}>{subtitle}</p>
+          </div>
+          <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+            <button type="button" onClick={clearConversation} style={btnStyle}>
+              🗑️ Nuova
+            </button>
+            <button type="button" onClick={exportPDF} style={btnStyle}>
+              📄 PDF
+            </button>
           </div>
         </div>
       </div>

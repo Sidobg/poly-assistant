@@ -5,7 +5,9 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 })
 
-const FILIERE_SYSTEM = `Sei un esperto analista di filiere per estrusione di polimeri nylon (PA6, PA66, PA6.10).
+const FILIERE_SYSTEM = `Lavori nello stabilimento Radici Yarn di Villa d'Ogna (BG), reparto filatura (POY). Conosci le filiere utilizzate per l'estrusione di filo nylon PA6, PA66 e PA6.10.
+
+Sei un esperto analista di filiere per estrusione di polimeri nylon (PA6, PA66, PA6.10).
 
 Il tuo compito è analizzare filiere per la produzione di filo nylon, sia tramite descrizioni testuali che tramite analisi di immagini.
 
@@ -77,7 +79,7 @@ export async function POST(request: NextRequest) {
         try {
           const response = await anthropic.messages.create({
             model: 'claude-sonnet-4-20250514',
-            max_tokens: 2048,
+            max_tokens: 4096,
             system: FILIERE_SYSTEM,
             messages,
             stream: true,

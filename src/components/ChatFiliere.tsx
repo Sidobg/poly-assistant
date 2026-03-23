@@ -9,6 +9,8 @@ const WELCOME_MESSAGE: Message = {
     'Benvenuto nell\'Analisi Filiere.\n\nPosso aiutarti a:\n• Analizzare lo stato di salute di una filiera tramite foto\n• Identificare usura, ostruzioni e depositi sui capillari\n• Stimare la vita residua e pianificare la manutenzione\n• Fornire un punteggio salute filiera da 1 a 10\n\nPrima di analizzare una foto, ti farò alcune domande per contestualizzare meglio l\'analisi (tipo, materiale, polimero in lavorazione, ecc.).\n\nComincia descrivendo la filiera o carica direttamente una foto.',
 }
 
+const STORAGE_KEY = 'poly-chat-filiere'
+
 export default function ChatFiliere() {
   const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE])
   const [input, setInput] = useState('')
@@ -18,9 +20,58 @@ export default function ChatFiliere() {
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
 
+  // Load from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY)
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMessages(parsed)
+          return
+        }
+      }
+    } catch {}
+    setMessages([WELCOME_MESSAGE])
+  }, [])
+
+  // Save to localStorage when messages change
+  useEffect(() => {
+    if (messages.length > 0) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(messages))
+      } catch {}
+    }
+  }, [messages])
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  const clearConversation = () => {
+    if (window.confirm('Vuoi cancellare la conversazione corrente?')) {
+      localStorage.removeItem(STORAGE_KEY)
+      setMessages([WELCOME_MESSAGE])
+    }
+  }
+
+  const exportPDF = () => {
+    const date = new Date().toLocaleDateString('it-IT')
+    const content = messages
+      .map(msg => {
+        const role = msg.role === 'user' ? 'Utente' : 'Assistente'
+        const text = msg.content.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')
+        return `<div class="message ${msg.role}"><div class="role">${role}</div><div class="content">${text}</div></div>`
+      })
+      .join('')
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Poly Assistant — Analisi Filiere — ${date}</title><style>body{font-family:Arial,sans-serif;max-width:800px;margin:0 auto;padding:20px;color:#333}.header{text-align:center;border-bottom:2px solid #333;padding-bottom:20px;margin-bottom:30px}.header h1{margin:0 0 5px;font-size:24px}.header p{margin:0;color:#666}.message{margin-bottom:20px;padding:15px;border-radius:8px}.message.user{background:#f0f4ff;border-left:4px solid #4f8cff}.message.assistant{background:#f8f8f8;border-left:4px solid #a78bfa}.role{font-weight:bold;margin-bottom:8px;font-size:12px;text-transform:uppercase;color:#666}.content{line-height:1.6}.footer{text-align:center;margin-top:40px;padding-top:20px;border-top:1px solid #ccc;color:#666;font-size:12px}</style></head><body><div class="header"><h1>Poly Assistant</h1><p>Analisi Filiere — ${date}</p></div>${content}<div class="footer">Powered by FutureAI — Automazioni AI per Aziende</div></body></html>`
+    const win = window.open('', '_blank')
+    if (win) {
+      win.document.write(html)
+      win.document.close()
+      win.print()
+    }
+  }
 
   const sendMessage = async () => {
     const text = input.trim()
@@ -138,18 +189,31 @@ export default function ChatFiliere() {
     }
   }
 
+  const btnStyle = {
+    padding: '6px 12px',
+    background: 'rgba(255,255,255,0.05)',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: '8px',
+    color: '#9499b0',
+    fontSize: '12px',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap' as const,
+    WebkitAppearance: 'none' as const,
+    fontFamily: 'inherit',
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Header */}
       <div
         style={{
-          padding: '18px 28px',
+          padding: '14px 20px',
           borderBottom: '1px solid rgba(255,255,255,0.06)',
           backgroundColor: '#1a1d27',
           flexShrink: 0,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div
             style={{
               width: '36px',
@@ -160,25 +224,26 @@ export default function ChatFiliere() {
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: '18px',
+              flexShrink: 0,
             }}
           >
             🔍
           </div>
-          <div>
-            <h2
-              style={{
-                color: '#e8eaf0',
-                fontWeight: 600,
-                fontSize: '16px',
-                margin: 0,
-                lineHeight: 1.2,
-              }}
-            >
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h2 style={{ color: '#e8eaf0', fontWeight: 600, fontSize: '15px', margin: 0, lineHeight: 1.2 }}>
               Analisi Filiere
             </h2>
-            <p style={{ color: '#9499b0', fontSize: '12px', margin: '3px 0 0' }}>
+            <p style={{ color: '#9499b0', fontSize: '11px', margin: '2px 0 0' }}>
               Diagnosi stato · Punteggio salute · Manutenzione
             </p>
+          </div>
+          <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+            <button type="button" onClick={clearConversation} style={btnStyle}>
+              🗑️ Nuova
+            </button>
+            <button type="button" onClick={exportPDF} style={btnStyle}>
+              📄 PDF
+            </button>
           </div>
         </div>
       </div>

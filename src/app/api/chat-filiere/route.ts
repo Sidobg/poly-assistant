@@ -69,87 +69,29 @@ export async function POST(request: NextRequest) {
       },
     ]
 
-    const encoder = new TextEncoder()
-
-    const stream = new ReadableStream({
-      async start(controller) {
-        try {
-          const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-api-key': process.env.ANTHROPIC_API_KEY!,
-              'anthropic-version': '2023-06-01',
-            },
-            body: JSON.stringify({
-              model: 'claude-sonnet-4-6',
-              max_tokens: 2048,
-              system: FILIERE_SYSTEM,
-              messages,
-              stream: true,
-            }),
-          })
-
-          if (!anthropicRes.ok || !anthropicRes.body) {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', content: `API error: ${anthropicRes.status}` })}\n\n`))
-            controller.close()
-            return
-          }
-
-          const reader = anthropicRes.body.getReader()
-          const decoder = new TextDecoder()
-          let buffer = ''
-          let doneSent = false
-
-          while (true) {
-            const { done, value } = await reader.read()
-            if (done) break
-
-            buffer += decoder.decode(value, { stream: true })
-            const lines = buffer.split('\n')
-            buffer = lines.pop() ?? ''
-
-            for (const line of lines) {
-              if (!line.startsWith('data: ')) continue
-              const data = line.slice(6).trim()
-              if (!data) continue
-              try {
-                const event = JSON.parse(data)
-                if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
-                  controller.enqueue(encoder.encode(
-                    `data: ${JSON.stringify({ type: 'text', content: event.delta.text })}\n\n`
-                  ))
-                } else if (event.type === 'message_stop') {
-                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`))
-                  doneSent = true
-                }
-              } catch {
-                // skip malformed JSON
-              }
-            }
-          }
-
-          if (!doneSent) {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`))
-          }
-          controller.close()
-        } catch (error) {
-          const msg = error instanceof Error ? error.message : 'Errore sconosciuto'
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ type: 'error', content: msg })}\n\n`)
-          )
-          controller.close()
-        }
-      },
-    })
-
-    return new NextResponse(stream, {
+    const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
       headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        Connection: 'keep-alive',
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY!,
+        'anthropic-version': '2023-06-01',
       },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 2048,
+        system: FILIERE_SYSTEM,
+        messages,
+        stream: false,
+      }),
     })
+
+    if (!anthropicRes.ok) {
+      return NextResponse.json({ error: `API error: ${anthropicRes.status}` }, { status: 500 })
+    }
+
+    const result = await anthropicRes.json()
+    const reply = result.content?.[0]?.text ?? ''
+    return NextResponse.json({ reply })
   } catch (error) {
     console.error('Errore chat-filiere:', error)
     return NextResponse.json({ error: 'Errore interno del server' }, { status: 500 })

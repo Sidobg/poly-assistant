@@ -117,9 +117,6 @@ export default function ChatExpert({ department }: ChatExpertProps) {
       .filter((_, i) => i > 0)
       .map(({ role, content }) => ({ role, content }))
 
-    const assistantMessageIndex = messages.length + 1
-    setMessages((prev) => [...prev, { role: 'assistant', content: '', isStreaming: true }])
-
     try {
       const response = await fetch('/api/chat-expert', {
         method: 'POST',
@@ -129,60 +126,19 @@ export default function ChatExpert({ department }: ChatExpertProps) {
 
       if (!response.ok) throw new Error('Risposta del server non valida')
 
-      const reader = response.body?.getReader()
-      const decoder = new TextDecoder()
-      let fullContent = ''
+      const data = await response.json()
+      if (data.error) throw new Error(data.error)
 
-      if (!reader) throw new Error('Stream non disponibile')
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-
-        const chunk = decoder.decode(value)
-        const lines = chunk.split('\n')
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6))
-              if (data.type === 'text') {
-                fullContent += data.content
-                setMessages((prev) =>
-                  prev.map((msg, i) =>
-                    i === assistantMessageIndex
-                      ? { ...msg, content: fullContent, isStreaming: true }
-                      : msg
-                  )
-                )
-              } else if (data.type === 'done') {
-                setMessages((prev) =>
-                  prev.map((msg, i) =>
-                    i === assistantMessageIndex ? { ...msg, isStreaming: false } : msg
-                  )
-                )
-              } else if (data.type === 'error') {
-                throw new Error(data.content)
-              }
-            } catch {
-              // ignora linee incomplete
-            }
-          }
-        }
-      }
+      setMessages((prev) => [...prev, { role: 'assistant', content: data.reply }])
     } catch (error) {
       console.error('Errore chat expert:', error)
-      setMessages((prev) =>
-        prev.map((msg, i) =>
-          i === assistantMessageIndex
-            ? {
-                ...msg,
-                content: 'Si è verificato un errore. Riprova tra poco.',
-                isStreaming: false,
-              }
-            : msg
-        )
-      )
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: 'Si è verificato un errore. Riprova tra poco.',
+        },
+      ])
     } finally {
       setIsLoading(false)
       inputRef.current?.focus()

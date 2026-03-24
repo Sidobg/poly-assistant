@@ -105,6 +105,8 @@ export default function ChatFiliere() {
       .filter((_, i) => i > 0)
       .map(({ role, content }) => ({ role, content }))
 
+    setMessages((prev) => [...prev, { role: 'assistant', content: '' }])
+
     try {
       const response = await fetch('/api/chat-filiere', {
         method: 'POST',
@@ -119,19 +121,43 @@ export default function ChatFiliere() {
 
       if (!response.ok) throw new Error('Risposta del server non valida')
 
-      const data = await response.json()
-      if (data.error) throw new Error(data.error)
+      const reader = response.body?.getReader()
+      const decoder = new TextDecoder()
+      let fullText = ''
 
-      setMessages((prev) => [...prev, { role: 'assistant', content: data.reply }])
+      if (!reader) throw new Error('Stream non disponibile')
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        const chunk = decoder.decode(value)
+        const lines = chunk.split('\n')
+        for (const line of lines) {
+          if (line.startsWith('data: ') && !line.includes('[DONE]')) {
+            try {
+              const data = JSON.parse(line.slice(6))
+              if (data.type === 'content_block_delta' && data.delta?.text) {
+                fullText += data.delta.text
+                setMessages((prev) => {
+                  const updated = [...prev]
+                  updated[updated.length - 1] = { ...updated[updated.length - 1], content: fullText }
+                  return updated
+                })
+              }
+            } catch {}
+          }
+        }
+      }
     } catch (error) {
       console.error('Errore chat filiere:', error)
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
+      setMessages((prev) => {
+        const updated = [...prev]
+        updated[updated.length - 1] = {
+          ...updated[updated.length - 1],
           content: 'Si è verificato un errore. Riprova tra poco.',
-        },
-      ])
+        }
+        return updated
+      })
     } finally {
       setIsLoading(false)
       inputRef.current?.focus()

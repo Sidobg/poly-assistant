@@ -73,15 +73,15 @@ export async function POST(request: NextRequest) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY!,
+        'x-api-key': process.env.ANTHROPIC_API_KEY?.trim() || '',
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
+        model: 'claude-sonnet-4-20250514',
         max_tokens: 2048,
+        stream: true,
         system: FILIERE_SYSTEM,
-        messages,
-        stream: false,
+        messages: messages,
       }),
     })
 
@@ -89,9 +89,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `API error: ${anthropicRes.status}` }, { status: 500 })
     }
 
-    const result = await anthropicRes.json()
-    const reply = result.content?.[0]?.text ?? ''
-    return NextResponse.json({ reply })
+    return new Response(anthropicRes.body, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      },
+    })
   } catch (error) {
     console.error('Errore chat-filiere:', error)
     return NextResponse.json({ error: 'Errore interno del server' }, { status: 500 })

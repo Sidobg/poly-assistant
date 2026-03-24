@@ -103,7 +103,7 @@ export default function Upload({ department }: UploadProps) {
     try {
       const response = await fetch(`/api/upload?id=${id}`, { method: 'DELETE' })
       if (!response.ok) throw new Error('Errore eliminazione')
-      setDocuments((prev) => prev.filter((d) => d.id !== id))
+      await loadDocuments()
     } catch {
       setUploadError("Errore durante l'eliminazione del documento")
     }
@@ -188,7 +188,7 @@ export default function Upload({ department }: UploadProps) {
                 fontWeight: 600,
               }}
             >
-              {documents.length} doc{documents.length !== 1 ? 's' : ''}
+              {documents.length} document{documents.length !== 1 ? 'i' : 'o'} caricati
             </div>
           )}
         </div>
